@@ -85,8 +85,7 @@ int main() {
 
     if(setupSerialPort(hSerial, COM_number, SerialParams))
     {
-       std::cout << "Port opened succesfully! Write \\exit and press enter to end session" << std::endl;   
-       delete[] SerialParams;
+       std::cout << "Port opened succesfully! Write \\exit and press enter to end session" << std::endl;  
     }
 
     else if(--nr_of_trials)
@@ -101,19 +100,31 @@ int main() {
     } 
 
     // Start a thread for logging data ( in paralel with reading bytes from terminal )
-    std::thread logThread(logSerialData, hSerial, std::ref(logFile), std::ref(logger), std::ref(condition));
+    std::thread logThread(logSerialData, std::ref(hSerial), std::ref(logFile), std::ref(logger), std::ref(condition));
+
+    // Start a thread for perpetually checking the communication with the serial device
+    std::thread connectionThread(CheckForConnection, std::ref(hSerial), std::ref(logFile), std::ref(logger), std::ref(COM_number), SerialParams, std::ref(condition));
 
     // Main thread sends commands to serial port
     sendSerialData(hSerial, std::ref(logFile), logger, condition);
 
     // Join threads (in case they are terminated)
     logThread.join();
+    connectionThread.join();
+
+    if(logger == true)
+    {
+       logData(std::string("End of current session...") + std::string("\r\0"),logFile);
+    }
 
     // Closing log file
     if(logFile.is_open())
     {
         logFile.close();
     }
+
+    // Deleting SerialParams array
+    delete[] SerialParams;
 
     // Closing serial port
     CloseHandle(hSerial);
